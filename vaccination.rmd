@@ -1,0 +1,151 @@
+---
+title: "vaccination"
+author: "Nitiphong Nirachornkul"
+date: "10/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(caret)
+
+Dataset<-read.csv("cap.csv", header=TRUE)
+glimpse(Dataset)
+
+
+```
+
+
+cleaning processes
+```{R}
+sum(is.na(Dataset))
+for (var in 1:39)
+{
+    summation <- (sum(is.na(Dataset[,var])))
+    name <- colnames(Dataset[var])
+    if (summation != 0)
+      {
+        print(paste(name," = ",summation))  
+      }
+    
+}
+```
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+
+train_Data <- function(a) 
+  {
+# shuffle the index for the testing data
+  testshuffle1<-sample(nrow(a), 0.3*nrow(a))
+ # Get the training data
+  trainData<-a[-testshuffle1,]
+
+  return(trainData)  
+}
+test_Data <- function(a) 
+  {
+# shuffle the index for the testing data
+  testshuffle1<-sample(nrow(a), 0.3*nrow(a))
+# Get the testing data
+  testData<-a[testshuffle1,]
+ 
+  return(testData)  
+}
+trainData<-as.data.frame(train_Data(Dataset))
+testData<-as.data.frame(test_Data(Dataset))
+
+```
+
+
+```{r, echo = TRUE}
+# The optimal k for model 1 is calculated below
+
+
+set.seed(5410)
+ctrl <- trainControl(method = "cv", number = 10)
+#fit a regression model and use k-fold CV to evaluate performance
+
+lm_model <- train(form = COVID_Death_count~.
+, data = trainData, method = "lm", trControl = ctrl)
+
+```
+## Including Plots
+```{R}
+knn_model <- train(form = COVID_Death_count~.
+, data = trainData, method = "knn", trControl = ctrl, tuneGrid = expand.grid(k = seq(1, 50, by = 2)))
+
+print(knn_model)
+```
+```{R}
+gbm_model <- train(form = COVID_Death_count~.
+, data = trainData, method = "pls")
+
+print(gbm_model)
+```
+
+```{R}
+gbm_model <- train(form = COVID_Death_count~.
+, data = trainData, method = "gbm", verbose = FALSE)
+
+print(gbm_model)
+```
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+print("                          RMSE            R-sqared")
+print(c("KNN",knn_model$results$RMSE[5], knn_model$results$Rsquared[5]))
+print(c("linear",lm_model$results$RMSE, lm_model$results$Rsquared))
+print(c("Partial least squares",pls_model$results$RMSE[3], pls_model$results$Rsquared[3]))
+print(c("Boosted tree",min(gbm_model$results$RMSE), max(gbm_model$results$Rsquared)))
+
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{R}
+summary(lm_model)
+lm_model<-lm(COVID_Death_count~.-All.other.conditions_with_covid-Alzheimer.disease_with_covid-Circulatory.diseases_with_covid-COVID.19-Diabetes_with_covid-Intentional.and.unintentional.injury..poisoning_with_covid - Malignant.neoplasms_with_covid- Obesity_with_covid-Renal.failure_with_covid-Respiratory.diseases_with_covid-Sepsis_with_covid-Vascular.and.unspecified.dementia_with_covid, data= trainData)
+summary(lm_model)
+
+
+```
+```{R}
+
+
+```
+
+Stepwise
+```{R}
+library(CombMSC)
+forward_model <-
+  step(lm_model,direction="forward", scope = (~.),trace = 0 )
+
+summary(forward_model)
+
+compare_function <- function(a) 
+{
+    MSPE_bestsubset=mean(a$residuals^2)
+    ADJR2_baestsubset=summary(a)$adj.r.squared
+    Mallow_bestsubset = Cp(a,S2=summary(lm_model)$sigma^2)
+    AIC_bestsubset = AIC(a,k=2)
+    BIC_bestsubset = AIC(a,k=log(length(trainData)))
+    print(c("Adjust R2 : ",ADJR2_baestsubset))
+    print(c("MPSE : ",MSPE_bestsubset))
+    print(c("Mallow : ",Mallow_bestsubset))
+    print(c("AIC : ",AIC_bestsubset))
+    print(c("BIC : ",BIC_bestsubset))
+}
+
+compare_function(lm_model)
+
+```
